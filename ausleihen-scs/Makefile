@@ -8,7 +8,7 @@ all: image
 
 image: data-container
 	docker run --rm \
-    -v $(CURDIR):/sbt-project \
+    -v "$(CURDIR)":/sbt-project \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -w /sbt-project	\
     --volumes-from $(DATA_CONTAINER_NAME) \
@@ -27,7 +27,7 @@ endif
 
 image-publish: image
 	docker run --rm \
-        -v $(CURDIR):/sbt-project \
+        -v "$(CURDIR)":/sbt-project \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -w /sbt-project	\
         --volumes-from $(DATA_CONTAINER_NAME) \
@@ -43,7 +43,7 @@ endif
 
 clean-project:
 	docker run --rm \
-    -v $(CURDIR):/sbt-project \
+    -v "$(CURDIR)":/sbt-project \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -w /sbt-project	\
     --volumes-from $(DATA_CONTAINER_NAME) \
