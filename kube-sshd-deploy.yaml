@@ -1,0 +1,22 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: ausleihen-sshd
+  namespace: bibliothek
+  labels:
+    app: ausleihen
+    role: backend
+    scs: ausleihen
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ausleihen
+  template:
+    metadata:
+      labels:
+        app: ausleihen
+    spec:
+      containers:
+      - name: bootcamp-sshd
+        image: quay.io/containerbootcamp/bootcamp-sshd:latest
