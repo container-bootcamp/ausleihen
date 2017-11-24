@@ -26,13 +26,7 @@ ifneq ($(DATA_CONTAINER),$(DATA_CONTAINER_NAME))
 endif
 
 image-publish: image
-	docker run --rm \
-        -v "$(CURDIR)":/sbt-project \
-        -v /var/run/docker.sock:/var/run/docker.sock \
-        -w /sbt-project	\
-        --volumes-from $(DATA_CONTAINER_NAME) \
-    	--name ausleihen-scs-builder \
-        $(BUILDER_IMAGE) sbt docker:publish
+	docker push $(BUILDER_IMAGE)
 
 clean-all: clean-data-container clean-project
 
