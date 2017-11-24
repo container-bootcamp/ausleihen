@@ -26,7 +26,7 @@ ifneq ($(DATA_CONTAINER),$(DATA_CONTAINER_NAME))
 endif
 
 image-publish: image
-    docker run --rm \
+	docker run --rm \
         -v $(CURDIR):/sbt-project \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -w /sbt-project	\
