@@ -2,6 +2,10 @@
 DATA_CONTAINER_NAME = ausleihen-sbt-cache
 DATA_CONTAINER = $(shell docker ps -a --format "{{.Names}}" | grep $(DATA_CONTAINER_NAME))
 
+# Have to correspond to the setting in build.sbt
+IMAGE_VERSION=latest
+IMAGE_NAME=quay.io/containerbootcamp/ausleihen:$(IMAGE_VERSION)
+
 BUILDER_IMAGE = quay.io/containerbootcamp/sbt-project-builder:latest
 
 all: image
@@ -26,7 +30,7 @@ ifneq ($(DATA_CONTAINER),$(DATA_CONTAINER_NAME))
 endif
 
 image-publish: image
-	docker push $(BUILDER_IMAGE)
+	docker push $(IMAGE_IMAGE)
 
 clean-all: clean-data-container clean-project
 
