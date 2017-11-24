@@ -30,7 +30,7 @@ ifneq ($(DATA_CONTAINER),$(DATA_CONTAINER_NAME))
 endif
 
 image-publish: image
-	docker push $(IMAGE_IMAGE)
+	docker push $(IMAGE_NAME)
 
 clean-all: clean-data-container clean-project
 
