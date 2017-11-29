@@ -6,14 +6,107 @@ metadata:
   name: ausleihen-config
   namespace: bibliothek
 data:
-  port: "80"
-  einbuchen.url: "http://einbuchen-intern:80/events"
-  postgres.superuser: "postgres"
-  postgres.superuser.password: "PpOoSsTtGgRrEeSs"
-  postgres.db: "ausleihen"
-  postgres.db.locale: "de_DE.utf-8"
-  postgres.host: "pgpool.infrastruktur"
-  postgres.jdbc.url: "jdbc:postgresql://pgpool.infrastruktur:5432/ausleihen"
+  CONTAINER_BOOTCAMP_AUSLEIHEN_PORT: "80"
+  CONTAINER_BOOTCAMP_EINBUCHEN_URL: "http://einbuchen-intern:80/events"
+  CONTAINER_BOOTCAMP_AKKA_PERSISTENCE_JDBC_URL: "jdbc:postgresql://pgpool.infrastruktur:5432/ausleihen"
+  CONTAINER_BOOTCAMP_AKKA_PERSISTENCE_USER: "postgres"
+  CONTAINER_BOOTCAMP_AKKA_PERSISTENCE_PASSWORD: "PpOoSsTtGgRrEeSs"
+
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ausleihen-pg-init-config
+  namespace: bibliothek
+data:
+  DB_SUPERUSER: "postgres"
+  DB_SUPERUSER_PASSWORD: "PpOoSsTtGgRrEeSs"
+  DB_NAME: "ausleihen"
+  DB_LOCALE: "de_DE.utf-8"
+  DB_HOST: "pgpool.infrastruktur"
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ausleihen-pg-init-scripts-1
+  namespace: bibliothek
+data:
+  1-ausleihen-init-db.sh: |
+    #!/usr/bin/env bash
+
+    #set -x
+    set -e
+
+    DB_LOCALE=${DB_LOCALE:?"DB_LOCALE is required"}
+
+    DB_HOST=${DB_HOST:?"DB_HOST is required"}
+    DB_SUPERUSER=${DB_SUPERUSER:?"DB_SUPERUSER is required"}
+    DB_SUPERUSER_PASSWORD=${DB_SUPERUSER_PASSWORD:?"DB_SUPERUSER_PASSWORD is required"}
+    DB_NAME=${DB_NAME:?"DB_NAME is required"}
+
+    echo ${DB_HOST}":*:*:"${DB_SUPERUSER}":"${DB_SUPERUSER_PASSWORD} > ~/.pgpass
+    chmod 0600 ~/.pgpass
+
+    PG_DB_EXISTS=`psql -U ${DB_SUPERUSER} -h ${DB_HOST} -tAc "SELECT EXISTS ( SELECT 1 from pg_database WHERE datname='${DB_NAME}');"`
+    PG_TABLE_EXISTS=`psql -U ${DB_SUPERUSER} -h ${DB_HOST} -tAc "SELECT EXISTS ( SELECT 1 FROM   information_schema.tables WHERE  table_schema = 'public' AND  table_name = 'journal' AND table_catalog = '${DB_NAME}');"`
+
+    PG_COLLATION_EXISTS=`psql -U ${DB_SUPERUSER} -h ${DB_HOST} -tAc "SELECT EXISTS( select 1 from pg_collation);"`
+    if test ${PG_COLLATION_EXISTS} = "f"; then
+      psql -U ${DB_SUPERUSER} -h ${DB_HOST} -tAc "CREATE COLLATION IF NOT EXISTS german (LOCALE = '${DB_LOCALE}');"
+    fi
+
+    if test ${PG_DB_EXISTS} = "f"; then
+      psql -U ${DB_SUPERUSER} -h ${DB_HOST} -tAc "CREATE DATABASE ${DB_NAME} WITH TEMPLATE = template0 ENCODING = 'UTF8' LC_COLLATE = '${DB_LOCALE}' LC_CTYPE = '${DB_LOCALE}';"
+    fi
+
+    if test ${PG_TABLE_EXISTS} == "f"; then
+      psql -U ${DB_SUPERUSER} -h ${DB_HOST} -tAc -d ${DB_NAME}  --file=/pg-init-manuell/akka-persistence.sql
+    fi
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ausleihen-pg-init-scripts-2
+  namespace: bibliothek
+data:
+  akka-persistence.sql: |
+    CREATE EXTENSION IF NOT EXISTS HSTORE;
+
+    CREATE TABLE IF NOT EXISTS journal (
+       "id" BIGSERIAL NOT NULL PRIMARY KEY,
+       "persistenceid" VARCHAR(254) NOT NULL,
+       "sequencenr" INT NOT NULL,
+       "rowid" BIGINT DEFAULT NULL,
+       "deleted" BOOLEAN DEFAULT false,
+       "payload" BYTEA,
+       "manifest" VARCHAR(512),
+       "uuid" VARCHAR(36) NOT NULL,
+       "writeruuid" VARCHAR(36) NOT NULL,
+       "created" timestamptz NOT NULL,
+       "tags" HSTORE,
+       "event" JSON,
+       constraint "cc_journal_payload_event" check (payload IS NOT NULL OR event IS NOT NULL)
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS journal_pidseq_idx ON journal (persistenceid, sequencenr);
+    CREATE UNIQUE INDEX IF NOT EXISTS journal_rowid_idx ON journal (rowid);
+
+    CREATE TABLE IF NOT EXISTS snapshot (
+       "persistenceid" VARCHAR(254) NOT NULL,
+       "sequencenr" INT NOT NULL,
+       "timestamp" bigint NOT NULL,
+       "snapshot" BYTEA,
+       "manifest" VARCHAR(512),
+       "json" JSON,
+       CONSTRAINT "cc_snapshot_payload_jsoin" check (snapshot IS NOT NULL OR (json IS NOT NULL AND manifest IS NOT NULL)),
+       PRIMARY KEY (persistenceid, sequencenr)
+    );
 
 ---
 
@@ -56,64 +149,23 @@ spec:
     spec:
       initContainers:
       - name: ausleihen-postgres-init
-        image: quay.io/containerbootcamp/ausleihen-pg-init
-        env:
-        - name: POSTGRES_HOST
-          valueFrom:
-            configMapKeyRef:
-              name: ausleihen-config
-              key: postgres.host
-        - name: POSTGRES_SUPERUSER
-          valueFrom:
-            configMapKeyRef:
-              name: ausleihen-config
-              key: postgres.superuser
-        - name: POSTGRES_SUPERUSER_PASSWORD
-          valueFrom:
-            configMapKeyRef:
-              name: ausleihen-config
-              key: postgres.superuser.password
-        - name: POSTGRES_DB
-          valueFrom:
-            configMapKeyRef:
-              name: ausleihen-config
-              key: postgres.db
-        - name: POSTGRES_DB_LOCALE
-          valueFrom:
-            configMapKeyRef:
-              name: ausleihen-config
-              key: postgres.db.locale
+        image: quay.io/containerbootcamp/postgres-init
+        envFrom:
+        - configMapRef:
+            name: ausleihen-pg-init-config
+        volumeMounts:
+        - name: ausleihen-init-scripts-1
+          mountPath: /pg-init
+        - name: ausleihen-init-scripts-2
+          mountPath: /pg-init-manuell
       containers:
       - name: varnish-ssi
         image: quay.io/containerbootcamp/alpine-varnish
       - name: ausleihen
         image: quay.io/containerbootcamp/ausleihen
-        env:
-        - name: CONTAINER_BOOTCAMP_AUSLEIHEN_PORT
-          valueFrom:
-            configMapKeyRef:
-              name: ausleihen-config
-              key: port
-        - name: CONTAINER_BOOTCAMP_EINBUCHEN_URL
-          valueFrom:
-            configMapKeyRef:
-              name: ausleihen-config
-              key: einbuchen.url
-        - name: CONTAINER_BOOTCAMP_AKKA_PERSISTENCE_USER
-          valueFrom:
-            configMapKeyRef:
-              name: ausleihen-config
-              key: postgres.superuser
-        - name: CONTAINER_BOOTCAMP_AKKA_PERSISTENCE_PASSWORD
-          valueFrom:
-            configMapKeyRef:
-              name: ausleihen-config
-              key: postgres.superuser.password
-        - name: CONTAINER_BOOTCAMP_AKKA_PERSISTENCE_JDBC_URL
-          valueFrom:
-            configMapKeyRef:
-              name: ausleihen-config
-              key: postgres.jdbc.url
+        envFrom:
+        - configMapRef:
+            name: ausleihen-config
         ports:
         - containerPort: 80
           protocol: TCP
@@ -130,6 +182,13 @@ spec:
         command:
         - "/go/bin/agent-linux"
         - "--collector.host-port=jaeger-collector.tracing:14267"
+      volumes:
+      - name: ausleihen-init-scripts-1
+        configMap:
+          name: ausleihen-pg-init-scripts-1
+      - name: ausleihen-init-scripts-2
+        configMap:
+          name: ausleihen-pg-init-scripts-2
 
 ---
 
