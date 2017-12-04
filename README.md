@@ -5,9 +5,15 @@ Buch anzeigen und ausleihen.
 
 ## Voraussetzung
 
+### Entwicklung 
+
 * docker installiert
 * java installiert
 * sbt installiert
+
+### Docker image erzeugen
+
+* docker installiert
 
 ## Einstiegspunkte 
 
@@ -25,10 +31,6 @@ SCS für das Ausleihen von Büchern
 Nginx-Konfiguration um den auf dem Cluster verwendeten ausleihen ingess
 zu simulieren.
 
-### docker-postgres-init
-
-Initialisierungs-Container um in der Postgres die Datenbank und Tabellen anzulegen,
-die für die Persistierung benötigt werden.
 
 #### Warnung
 
