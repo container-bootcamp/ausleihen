@@ -2,12 +2,13 @@ package container.bootcamp.ausleihen.books
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.persistence.pg.journal.query.PostgresReadJournal
-import akka.persistence.query.{EventEnvelope, PersistenceQuery}
+import akka.persistence.query.EventEnvelope
 import akka.stream.ActorMaterializer
 import container.bootcamp.ausleihen.books.Book.BookEvents._
 import container.bootcamp.ausleihen.books.BookLibrarian.{BookNotFound, createBookName}
 import container.bootcamp.ausleihen.books.BookLibrarianLookup._
 
+import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success}
 
 /**
@@ -15,7 +16,7 @@ import scala.util.{Failure, Success}
   * eg. request for bookData or lent state
   */
 object BookLibrarianLookup {
-  def props: Props = Props(new BookLibrarianLookup)
+  def props(readJournal: PostgresReadJournal): Props = Props(new BookLibrarianLookup(readJournal))
   sealed abstract class BookDataLookupResult
   case class BookIsLent(isbn:String)
   case class BookLentState(lend: Boolean) extends BookDataLookupResult
@@ -28,13 +29,10 @@ object BookLibrarianLookup {
 
   case class BookGet(isbn: String)
 }
-class BookLibrarianLookup extends Actor with ActorLogging {
+class BookLibrarianLookup(readJournal: PostgresReadJournal) extends Actor with ActorLogging {
 
-  implicit val materializer = ActorMaterializer.create(context)
-  implicit val ec = context.system.dispatcher
-
-  val readJournal = PersistenceQuery(context.system)
-    .readJournalFor[PostgresReadJournal](PostgresReadJournal.Identifier)
+  implicit val materializer: ActorMaterializer = ActorMaterializer.create(context)
+  implicit val ec: ExecutionContext = context.system.dispatcher
 
   var lastsequenceNr = Map.empty[String, Long].withDefaultValue(0L)
 
@@ -104,7 +102,7 @@ class BookLibrarianLookup extends Actor with ActorLogging {
         book.copy(author = Option(event.author))
       case EventEnvelope(_, _, _, event: BookDescriptionUpdated) =>
         book.copy(shortDescription = Option(event.description))
-      case EventEnvelope(_, _, _, event: BookLendUpdated) =>
+      case EventEnvelope(_, _, _, event: BookLentUpdated) =>
         book.copy(lend = event.lend)
       case unmatchedEnvelope: EventEnvelope =>
         log.debug("unused event" + unmatchedEnvelope.event.getClass.getName)

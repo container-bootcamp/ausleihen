@@ -113,7 +113,7 @@ data:
 apiVersion: v1
 kind: Service
 metadata:
-  name: ausleihen
+  name: ausleihen-extern
   namespace: bibliothek
   labels:
     app: ausleihen
@@ -125,6 +125,24 @@ spec:
     name: web
   selector:
     app: ausleihen
+
+---
+
+## Für das interne SSE Interface
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ausleihen-intern
+  namespace: bibliothek
+spec:
+  ports:
+  - port: 80
+    name: web
+  selector:
+    app: ausleihen
+    role: backend
+    scs: ausleihen
 
 ---
 
@@ -214,5 +232,5 @@ spec:
       paths:
       - path: /ausleihen
         backend:
-          serviceName: ausleihen
+          serviceName: ausleihen-extern
           servicePort: 8080

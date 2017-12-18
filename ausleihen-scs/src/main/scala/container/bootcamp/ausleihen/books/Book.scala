@@ -30,7 +30,7 @@ object Book {
     case class BookTitleUpdated(title: String) extends BookEvent
     case class BookAuthorUpdated(author: String) extends BookEvent
     case class BookDescriptionUpdated(description: String) extends BookEvent
-    case class BookLendUpdated(lend: Boolean) extends BookEvent
+    case class BookLentUpdated(lend: Boolean) extends BookEvent
 
   }
 
@@ -57,12 +57,12 @@ class Book extends PersistentActor with ActorLogging {
       if(title != bdTitle) persist(BookTitleUpdated(bdTitle)) {e => title = e.title}
       if(author != bdAuthor) persist(BookAuthorUpdated(bdAuthor)) {e => author = e.author}
       if(description != bdDescription) persist(BookDescriptionUpdated(bdDescription)) {e => description = e.description}
-      if(lent != bdLend) persist(BookLendUpdated(bdLend)) { e => lent = e.lend}
+      if(lent != bdLend) persist(BookLentUpdated(bdLend)) { e => lent = e.lend}
 
     case BookLend =>
 
       if(!lent) {
-        persist(BookLendUpdated(true)) { e =>
+        persist(BookLentUpdated(true)) { e =>
             lent = e.lend
             sender ! BookLent(lent)
         }
@@ -73,7 +73,7 @@ class Book extends PersistentActor with ActorLogging {
     case BookReturn =>
 
       if(lent) {
-        persist(BookLendUpdated(false)) { e =>
+        persist(BookLentUpdated(false)) { e =>
             lent = e.lend
             sender ! BookReturned(lent)
         }
@@ -88,6 +88,6 @@ class Book extends PersistentActor with ActorLogging {
     case BookTitleUpdated(bdTitle) => title = bdTitle
     case BookAuthorUpdated(bdAuthor) => author = bdAuthor
     case BookDescriptionUpdated(bdDescription) => description = bdDescription
-    case BookLendUpdated(bdLend) => lent = bdLend
+    case BookLentUpdated(bdLend) => lent = bdLend
   }
 }
