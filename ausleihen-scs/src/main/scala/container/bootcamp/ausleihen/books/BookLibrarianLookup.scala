@@ -40,6 +40,10 @@ class BookLibrarianLookup extends Actor with ActorLogging {
 
   /*
    * Read all book events to keep the latest sequence number of a persistence id in mind
+   * Stream never ends.
+   *
+   * This is needed due on query the exact last seqNr have to provided otherwise the the stream never stops on a
+   * request.
    */
   readJournal.allEvents(0L).runForeach {
     case EventEnvelope(_, id, seqNo, _: BookEvent) => lastsequenceNr = lastsequenceNr + (id -> seqNo)

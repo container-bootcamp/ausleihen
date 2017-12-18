@@ -9,7 +9,7 @@ import akka.stream.ActorMaterializer
 import akka.stream.alpakka.sse.scaladsl.EventSource
 import container.bootcamp.ausleihen.AppConfig.ContainerBootcampEinbuchenConfig._
 import container.bootcamp.ausleihen.books.Book._
-import container.bootcamp.ausleihen.books.BookLibrarian.BookReaderEvents.{BookIsbnReceived, MessageReceived}
+import container.bootcamp.ausleihen.books.BookLibrarian.BookLibrarianEvents.{BookIsbnReceived, MessageReceived}
 import container.bootcamp.ausleihen.books.BookLibrarian.{BookNotFound, BookLent => BookLibrarianBookLent}
 import container.bootcamp.ausleihen.util.JsonMapper
 import BookLibrarian.createBookName
@@ -32,7 +32,7 @@ object BookLibrarian {
 
   def createBookName(isbn: String): String = s"$namePrefix-$isbn"
 
-  object BookReaderEvents {
+  object BookLibrarianEvents {
     case class MessageReceived(id: Option[String])
     case class BookIsbnReceived(isbn: String)
   }
@@ -56,7 +56,7 @@ class BookLibrarian extends PersistentActor with ActorLogging {
    * for on older book comes in the book isn't known. With this isbn
    * directory a look up is made whether the books already exists.
    */
-  var knownBooks = List.empty[String]
+  var knownBooks = Set.empty[String]
 
   /*
    * Crate a new book actor which holds and persist the book state.
@@ -91,7 +91,7 @@ class BookLibrarian extends PersistentActor with ActorLogging {
         val bookData = JsonMapper.fromJson[BookData](data).copy(id = e.id)
         persist(BookIsbnReceived(bookData.Isbn)) {
           e =>
-            knownBooks = e.isbn +: knownBooks
+            knownBooks += e.isbn
             context.child(createBookName(bookData.Isbn)).getOrElse(createBook(bookData.Isbn)) ! bookData
             log.debug("create book with data: " + bookData)
         }
@@ -113,7 +113,7 @@ class BookLibrarian extends PersistentActor with ActorLogging {
 
   def receiveRecover: PartialFunction[Any, Unit] = {
     case MessageReceived(id) => lastMessageId = id
-    case BookIsbnReceived(isbn) => knownBooks =  isbn +: knownBooks
+    case BookIsbnReceived(isbn) => knownBooks += isbn
     case RecoveryCompleted =>
       EventSource(Uri(cbeUrl), send, lastMessageId, 1.second)
       .runForeach(serverSentEvent => self ! serverSentEvent)
