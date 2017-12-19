@@ -115,21 +115,18 @@ kind: Service
 metadata:
   name: ausleihen-extern
   namespace: bibliothek
-  labels:
-    app: ausleihen
-    role: frontend
-    scs: ausleihen
 spec:
   ports:
   - port: 8080
     name: web
   selector:
     app: ausleihen
+    role: backend
+    scs: ausleihen
 
 ---
 
 ## Für das interne SSE Interface
-
 apiVersion: v1
 kind: Service
 metadata:
@@ -151,19 +148,19 @@ kind: Deployment
 metadata:
   name: ausleihen
   namespace: bibliothek
-  labels:
-    app: ausleihen
-    role: backend
-    scs: ausleihen
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: ausleihen
+      role: backend
+      scs: ausleihen
   template:
     metadata:
       labels:
         app: ausleihen
+        role: backend
+        scs: ausleihen
     spec:
       initContainers:
       - name: ausleihen-postgres-init
@@ -212,7 +209,7 @@ spec:
 
 #####
 # ingress to assets, test f.e. with
-# curl http://bootcamp.ch.innoq.io/einbuchen/books
+# curl http://bootcamp.ch.innoq.io/ausleihen/books
 #####
 
 apiVersion: extensions/v1beta1
