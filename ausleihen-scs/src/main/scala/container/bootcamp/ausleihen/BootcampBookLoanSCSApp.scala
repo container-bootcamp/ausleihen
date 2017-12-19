@@ -133,6 +133,6 @@ object BootcampBookLoanSCSApp extends App with Logging with LendServerSendEvents
       }
   }
 
-  Http().bindAndHandle(route, "localhost", AppConfig.ContainerBootcampAusleihenConfig.cbaPort)
+  Http().bindAndHandle(route, "0.0.0.0", AppConfig.ContainerBootcampAusleihenConfig.cbaPort)
 
 }
