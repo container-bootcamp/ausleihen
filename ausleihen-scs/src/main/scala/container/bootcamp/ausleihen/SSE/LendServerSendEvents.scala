@@ -1,9 +1,11 @@
 package container.bootcamp.ausleihen.SSE
 
+import akka.NotUsed
 import akka.http.scaladsl.model.sse.ServerSentEvent
+import akka.persistence.pg.journal.query.PostgresReadJournal
 import akka.persistence.query.EventEnvelope
 import akka.stream.ActorMaterializer
-import container.bootcamp.ausleihen.BootcampBookLoanSCSApp.readJournal
+import akka.stream.scaladsl.Source
 import container.bootcamp.ausleihen.books.Book.BookEvents.BookLentUpdated
 import container.bootcamp.ausleihen.util.JsonMapper
 
@@ -15,6 +17,7 @@ trait LendServerSendEvents {
 
   def materializer: ActorMaterializer
   def ec: ExecutionContext
+  def readJournal: PostgresReadJournal
 
   def extractIsbn(persistenceId: String): String = {
     persistenceId.split("-").last
@@ -22,18 +25,16 @@ trait LendServerSendEvents {
 
   case class SSEBookLentUpdated(isbn: String, lent: Boolean)
 
-  def sseLent(offset: Long) = {
+  def sseLent(offset: Long): Source[ServerSentEvent, NotUsed] = {
 
-    readJournal.allEvents(offset).map {
+    readJournal.eventsByTags(Set("book" -> "book-lent-updated"),offset).map {
       case EventEnvelope(envOffset, id, _, event: BookLentUpdated) =>
-        Option(ServerSentEvent(
+        ServerSentEvent(
           JsonMapper.toJson(SSEBookLentUpdated(extractIsbn(id), event.lend)),
           "book-lent-updated",
           envOffset.toString
-        ))
-      case _ => None
-    }.dropWhile(e => e.isEmpty).map(_.get).keepAlive(5.second, () => ServerSentEvent.heartbeat)
-
+        )
+    }.keepAlive(5.second, () => ServerSentEvent.heartbeat)
 
   }
 

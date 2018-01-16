@@ -38,6 +38,7 @@ object BootcampBookLoanSCSApp extends App with Logging with LendServerSendEvents
 
   val readJournal = PersistenceQuery(system)
     .readJournalFor[PostgresReadJournal](PostgresReadJournal.Identifier)
+
   val bookLibrarianLookup = system.actorOf(BookLibrarianLookup.props(readJournal), "book-librarian-lookup")
 
   val headers = Seq(
@@ -118,6 +119,7 @@ object BootcampBookLoanSCSApp extends App with Logging with LendServerSendEvents
         getFromResourceDirectory("assets")
       } ~
       path("events") {
+
         import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
         optionalHeaderValueByName("Last-Event-ID") {
           case Some(id) =>
