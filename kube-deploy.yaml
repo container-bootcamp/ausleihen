@@ -8,6 +8,7 @@ metadata:
 data:
   CONTAINER_BOOTCAMP_AUSLEIHEN_PORT: "80"
   CONTAINER_BOOTCAMP_EINBUCHEN_URL: "http://einbuchen-intern:80/events"
+  CONTAINER_BOOTCAMP_RESERVIEREN_URL: "http://reservieren-intern:80/events"
   CONTAINER_BOOTCAMP_AKKA_PERSISTENCE_JDBC_URL: "jdbc:postgresql://pgpool.infrastruktur:5432/ausleihen"
   CONTAINER_BOOTCAMP_AKKA_PERSISTENCE_USER: "postgres"
   CONTAINER_BOOTCAMP_AKKA_PERSISTENCE_PASSWORD: "PpOoSsTtGgRrEeSs"

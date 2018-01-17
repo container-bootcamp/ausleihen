@@ -25,7 +25,8 @@ object BookLibrarianLookup {
                             title: Option[String] = None,
                             author: Option[String] = None,
                             shortDescription: Option[String] = None,
-                            lend: Boolean = false) extends BookDataLookupResult
+                            lent: Boolean = false,
+                            reserved: Boolean = false) extends BookDataLookupResult
 
   case class BookGet(isbn: String)
 }
@@ -49,7 +50,7 @@ class BookLibrarianLookup(readJournal: PostgresReadJournal) extends Actor with A
   }
 
   private def lentTransform(bookDataLookup: BookDataLookup) = {
-    BookLentState(bookDataLookup.lend)
+    BookLentState(bookDataLookup.lent)
   }
 
   private def bookDataTransform(bookDataLookup: BookDataLookup) = {
@@ -103,7 +104,9 @@ class BookLibrarianLookup(readJournal: PostgresReadJournal) extends Actor with A
       case EventEnvelope(_, _, _, event: BookDescriptionUpdated) =>
         book.copy(shortDescription = Option(event.description))
       case EventEnvelope(_, _, _, event: BookLentUpdated) =>
-        book.copy(lend = event.lend)
+        book.copy(lent = event.lend)
+      case EventEnvelope(_, _,_, event: BookReservedUpdated) =>
+        book.copy(reserved = event.reserved)
       case unmatchedEnvelope: EventEnvelope =>
         log.debug("unused event" + unmatchedEnvelope.event.getClass.getName)
         book

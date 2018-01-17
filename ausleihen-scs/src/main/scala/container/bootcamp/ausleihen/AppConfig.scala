@@ -20,4 +20,9 @@ object AppConfig {
     val cbeUrl = cbeConfig.getString("url")
   }
 
+  object ContainerBootcampReservierenConfig {
+    val cbrConfig = config.getConfig("container.bootcamp.reservieren")
+    val cbrUrl = cbrConfig.getString("url")
+  }
+
 }

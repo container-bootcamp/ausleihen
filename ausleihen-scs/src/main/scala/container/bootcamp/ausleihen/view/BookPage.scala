@@ -41,23 +41,32 @@ object BookPages {
 
   def bookPage(bookData: BookDataLookup): String = {
 
-    val lent = if(bookData.lend)
+    val lent = if(bookData.lent)
       """<span class="badge badge-danger">ja</span>"""
-    else """<span class="badge badge-success">nein</span>"""
+    else
+      """<span class="badge badge-success">nein</span>"""
 
-    val loanForm = {
-      if(bookData.lend) {
-        """
-           |  <input type="hidden" name="lent" value="false">
-           |  <button class="btn btn-dark" type="submit">Zurück Geben</button>
-           |""".stripMargin
-      }
-      else {
-        """
-           |  <input type="hidden" name="lent" value="true">
-           |  <button class="btn btn-dark" type="submit">Ausleihen</button>
-           |""".stripMargin
-      }
+
+    val reserved = if(bookData.reserved)
+      """<span class="badge badge-danger">ja</span>"""
+    else
+      """<span class="badge badge-success">nein</span>"""
+
+      val loanForm = {
+        if(!bookData.reserved) {
+          if (bookData.lent) {
+            """
+              |  <input type="hidden" name="lent" value="false">
+              |  <button class="btn btn-dark" type="submit">Zurück Geben</button>
+              |""".stripMargin
+          }
+          else {
+            """
+              |  <input type="hidden" name="lent" value="true">
+              |  <button class="btn btn-dark" type="submit">Ausleihen</button>
+              |""".stripMargin
+          }
+        } else ""
     }
 
     s"""
@@ -76,6 +85,7 @@ object BookPages {
        |                <p class="card-text">Kurzbeschreibung: ${bookData.shortDescription.getOrElse("")}</p><br>
        |                Isbn: ${bookData.isbn.getOrElse("")}<br>
        |                Ausgeliehen: $lent<br>
+       |                Reserviert: $reserved<br>
        |                <br>
        |                <form action="/ausleihen/book/${bookData.isbn.getOrElse("")}/lent" method="post">
        |                  $loanForm

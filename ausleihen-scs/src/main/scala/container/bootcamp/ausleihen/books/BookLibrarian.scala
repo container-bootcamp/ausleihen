@@ -8,8 +8,9 @@ import akka.persistence.{PersistentActor, RecoveryCompleted}
 import akka.stream.ActorMaterializer
 import akka.stream.alpakka.sse.scaladsl.EventSource
 import container.bootcamp.ausleihen.AppConfig.ContainerBootcampEinbuchenConfig._
+import container.bootcamp.ausleihen.AppConfig.ContainerBootcampReservierenConfig._
 import container.bootcamp.ausleihen.books.Book._
-import container.bootcamp.ausleihen.books.BookLibrarian.BookLibrarianEvents.{BookIsbnReceived, MessageReceived}
+import container.bootcamp.ausleihen.books.BookLibrarian.BookLibrarianEvents.{BookIsbnReceived, BookMessageReceived, BookReservedMessageReceived}
 import container.bootcamp.ausleihen.books.BookLibrarian.{BookNotFound, BookLent => BookLibrarianBookLent}
 import container.bootcamp.ausleihen.util.JsonMapper
 import BookLibrarian.createBookName
@@ -33,7 +34,8 @@ object BookLibrarian {
   def createBookName(isbn: String): String = s"$namePrefix-$isbn"
 
   object BookLibrarianEvents {
-    case class MessageReceived(id: Option[String])
+    case class BookMessageReceived(id: Option[String])
+    case class BookReservedMessageReceived(id: Option[String])
     case class BookIsbnReceived(isbn: String)
   }
 }
@@ -45,10 +47,18 @@ class BookLibrarian extends PersistentActor with ActorLogging {
   override def persistenceId: String = self.path.name
 
   /*
-   * Hold the last received sse message id. So on restart only the
+   * Hold the last received sse books message id. So on restart only the
    * difference has to be load
    */
-  var lastMessageId: Option[String] = None
+  var lastBooksMessageId: Option[String] = None
+
+
+  /*
+   * Hold the last received sse books received message id. So on restart only the
+   * difference has to be load
+   */
+  var lastBooksReservedMessageId: Option[String] = None
+
 
   /*
    * All book isbn's managed by the book librarian. When apps restart
@@ -87,13 +97,33 @@ class BookLibrarian extends PersistentActor with ActorLogging {
 
   def receiveCommand: PartialFunction[Any, Unit] = {
     case ServerSentEvent(data, Some("BuchEingebucht"), Some(id), _ ) =>
-      persist(MessageReceived(Some(id))){ e =>
+      persist(BookMessageReceived(Some(id))){ e =>
         val bookData = JsonMapper.fromJson[BookData](data).copy(id = e.id)
         persist(BookIsbnReceived(bookData.Isbn)) {
           e =>
             knownBooks += e.isbn
             context.child(createBookName(bookData.Isbn)).getOrElse(createBook(bookData.Isbn)) ! bookData
             log.debug("create book with data: " + bookData)
+        }
+
+      }
+    case ServerSentEvent(data, Some("book-reserved-updated"), Some(id), _ ) =>
+      persist(BookReservedMessageReceived(Some(id))){ e =>
+        val bookReserved = JsonMapper.fromJson[BookReserved](data)
+
+
+        if(knownBooks.contains(bookReserved.Isbn)){
+          findChild(bookReserved.Isbn) {
+            book =>
+              book ! bookReserved
+          }
+        } else {
+          persist(BookIsbnReceived(bookReserved.Isbn)) {
+            e =>
+              knownBooks += e.isbn
+              context.child(createBookName(bookReserved.Isbn)).getOrElse(createBook(e.isbn)) ! bookReserved
+              log.debug("create book reserved with data: " + bookReserved)
+          }
         }
 
       }
@@ -112,11 +142,18 @@ class BookLibrarian extends PersistentActor with ActorLogging {
   }
 
   def receiveRecover: PartialFunction[Any, Unit] = {
-    case MessageReceived(id) => lastMessageId = id
+    case BookMessageReceived(id) => lastBooksMessageId = id
+    case BookReservedMessageReceived(id) => lastBooksReservedMessageId = id
     case BookIsbnReceived(isbn) => knownBooks += isbn
     case RecoveryCompleted =>
-      EventSource(Uri(cbeUrl), send, lastMessageId, 1.second)
+      //Start reading the sse message event stream for books
+      EventSource(Uri(cbeUrl), send, lastBooksMessageId, 1.second)
       .runForeach(serverSentEvent => self ! serverSentEvent)
+
+      //Start reading the sse message event stream for books reserved
+      EventSource(Uri(cbrUrl), send, lastBooksReservedMessageId, 1.second)
+        .runForeach(serverSentEvent => self ! serverSentEvent)
+
     case event => log.debug("Unexpected:" + event)
   }
 }
